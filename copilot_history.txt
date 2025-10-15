@@ -1,0 +1,7 @@
+user: create simple code "HELLO WORLD"
+copilot: #include <iostream>
+
+int main() {
+    std::cout << "Hello, world!" << std::endl;
+    return 0;
+}
