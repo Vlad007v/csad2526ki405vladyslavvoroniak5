@@ -1,0 +1,30 @@
+{
+  "configurations": [
+    {
+      "name": "macOS (CMake)",
+      "compileCommands": "${workspaceFolder}/build/compile_commands.json",
+      "includePath": [
+        "${workspaceFolder}/**",
+        "${workspaceFolder}/tests",
+        "${workspaceFolder}/build/_deps/googletest-src/googletest/include",
+        "${workspaceFolder}/build/_deps/googletest-src/googlemock/include",
+        "${workspaceFolder}/build/_deps/googletest-src",
+        "/usr/local/include",
+        "/Library/Developer/CommandLineTools/usr/include/c++/v1"
+      ],
+      "defines": [],
+      "compilerPath": "/usr/bin/clang",
+      "cStandard": "c11",
+      "cppStandard": "c++17",
+  "intelliSenseMode": "macos-clang-arm64",
+      "browse": {
+        "path": [
+          "${workspaceFolder}",
+          "${workspaceFolder}/build/_deps/googletest-src/googletest/include"
+        ],
+        "limitSymbolsToIncludedHeaders": true
+      }
+    }
+  ],
+  "version": 4
+}
