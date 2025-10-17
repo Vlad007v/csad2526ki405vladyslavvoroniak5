@@ -1,0 +1,41 @@
+user: створи функцію int
+add(int a, int b)
+
+copilot: Додав декларацію у math_operations.h:
+int add(int a, int b);
+Реалізував функцію в math_operations.cpp:
+int add(int a, int b) { return a + b; }
+Оновив main.cpp — тепер викликає add(3, 4) і друкує результат.
+Вніс правку в CMakeLists.txt, щоб включити math_operations.cpp у збірку.
+Переконфігурував і зібрав проект з CMake, запустив виконуваний файл. Вивід:
+Hello, world!
+add(3, 4) = 7
+
+user: Напиши юніт тести
+
+copilot: Created simple tests in unit_tests.cpp (minimal assertion helpers).
+Tests: add(0,0), add(1,2), add(-1,1), add(100,200).
+On success, prints "All 4 tests passed."
+Updated CMakeLists.txt to add a unit_tests executable and register it with CTest:
+add_executable(unit_tests unit_tests.cpp math_operations.cpp)
+add_test(NAME unit_tests COMMAND unit_tests)
+Built the project and ran the test binary directly (ctest wasn't on PATH). Result: "All 4 tests passed."
+
+user: додавання підтримки Google Test
+
+copilot: CMakeLists.txt: added FetchContent to download GoogleTest (release-1.12.1), set gtest options, and linked unit_tests against GTest::gtest_main. Also used gtest_discover_tests to register tests with CTest.
+unit_tests.cpp: replaced the ad-hoc test runner with Google Test cases validating add.
+
+
+user: додайте інструкції для створення тестового
+виконуваного файлу та запуску тестів
+
+copilot: Що додано
+
+Як конфігурувати та збирати тільки unit_tests (швидша збірка).
+Як запустити тестовий бінар та як фільтрувати по імені тесту (--gtest_filter).
+Нагадування про rebuild.sh.
+Приклади команд у README можна копіювати в zsh і вони повинні працювати у твоєму середовищі. Якщо хочеш, можу також:
+
+Додати make test-подібну ціль у CMake (що виконає ctest) — зараз ctest доступний, але команда cmake --build . --target test може бути зручна.
+Додати launch-конфіг для відлагодження тестів у VS Code.
