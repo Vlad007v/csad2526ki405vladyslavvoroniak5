@@ -1,0 +1,10 @@
+user: заповни CMakeLists
+
+copilot: Files changed
+CMakeLists.txt — now contains:
+project declaration with version and C++ language
+C++17 configuration
+add_executable using ${PROJECT_NAME}
+install rule and testing placeholder
+(You can open the file to review the exact contents — it's been updated in the workspace.)
+
