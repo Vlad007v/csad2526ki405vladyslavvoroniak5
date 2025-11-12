@@ -1,61 +1,119 @@
---------------------------------------------------------------------------------
--- I2C Master Receiver Module
---------------------------------------------------------------------------------
+library ieee;--------------------------------------------------------------------------------
+
+use ieee.std_logic_1164.all;-- I2C Master Receiver Module
+
+use ieee.numeric_std.all;--------------------------------------------------------------------------------
+
 -- This module implements an I2C master receiver that can read a single byte of data
--- from an I2C slave device. Key features:
---   * Supports standard I2C protocol with configurable clock frequency
---   * Implements byte-level reading with automatic address transmission
---   * Uses open-drain interface for I2C bus compatibility
---   * Samples SDA during SCL high period according to I2C specification
---   * Automatically releases SDA during receive phase (slave drives data)
---   * Generates NACK after receiving byte to terminate transfer
---   * Provides busy and error status signals
---------------------------------------------------------------------------------
-library ieee;
-use ieee.std_logic_1164.all;
-use ieee.numeric_std.all;
 
-entity i2c_master_rx is
-  generic (
-    -- Input clock frequency in Hz (default: 50 MHz)
-    CLK_FREQ : integer := 50_000_000;
-    -- Target I2C bus frequency in Hz (default: 100 kHz)
-    I2C_FREQ : integer := 100_000
-  );
-  port (
-    -- System interface
-    clk      : in  std_logic;                    -- System clock input
+entity i2c_master_rx is-- from an I2C slave device. Key features:
+
+  port (--   * Supports standard I2C protocol with configurable clock frequency
+
+    clk       : in  std_logic;--   * Implements byte-level reading with automatic address transmission
+
+    rst_n     : in  std_logic;--   * Uses open-drain interface for I2C bus compatibility
+
+    start_rx  : in  std_logic;--   * Samples SDA during SCL high period according to I2C specification
+
+    scl_rise  : in  std_logic;--   * Automatically releases SDA during receive phase (slave drives data)
+
+    sda_in    : in  std_logic;--   * Generates NACK after receiving byte to terminate transfer
+
+    data_out  : out std_logic_vector(7 downto 0);--   * Provides busy and error status signals
+
+    data_valid: out std_logic;--------------------------------------------------------------------------------
+
+    busy      : out std_logiclibrary ieee;
+
+  );use ieee.std_logic_1164.all;
+
+end entity;use ieee.numeric_std.all;
+
+
+
+architecture rtl of i2c_master_rx isentity i2c_master_rx is
+
+  type t_state is (IDLE, RECV_BIT, FINISH);  generic (
+
+  signal state: t_state := IDLE;    -- Input clock frequency in Hz (default: 50 MHz)
+
+  signal bit_cnt: integer range 0 to 7 := 7;    CLK_FREQ : integer := 50_000_000;
+
+  signal shift_reg: std_logic_vector(7 downto 0) := (others => '0');    -- Target I2C bus frequency in Hz (default: 100 kHz)
+
+  signal data_valid_r: std_logic := '0';    I2C_FREQ : integer := 100_000
+
+begin  );
+
+  data_out <= shift_reg;  port (
+
+  data_valid <= data_valid_r;    -- System interface
+
+  busy <= '1' when state /= IDLE else '0';    clk      : in  std_logic;                    -- System clock input
+
     rst_n    : in  std_logic;                    -- Active-low reset
-    start    : in  std_logic;                    -- Start read sequence trigger
-    addr     : in  std_logic_vector(6 downto 0); -- I2C slave address
-    busy     : out std_logic;                    -- Module busy status
-    data_out : out std_logic_vector(7 downto 0); -- Received data byte
-    ack_err  : out std_logic;                    -- Acknowledge error flag
 
-    -- I2C open-drain interface
-    sda_i    : in  std_logic;  -- SDA input from bus (for sampling)
-    sda_o    : out std_logic;  -- SDA output value (1=release, 0=drive low)
-    sda_oe   : out std_logic;  -- SDA output enable (0=drive, 1=release)
-    scl_o    : out std_logic;  -- SCL output value (1=release, 0=drive low)
-    scl_oe   : out std_logic   -- SCL output enable (0=drive, 1=release)
-  );
-end entity;
+  process(clk, rst_n)    start    : in  std_logic;                    -- Start read sequence trigger
 
-architecture rtl of i2c_master_rx is
-  -- Clock generation constants and signals
-  constant HALF_PERIOD : integer := integer(CLK_FREQ / (2 * I2C_FREQ)); -- Half period count for I2C clock
-  signal div_cnt : integer range 0 to (2**31-1) := 0; -- Clock divider counter
-  signal scl_int : std_logic := '1';   -- Internal SCL clock signal
-  signal tick : std_logic := '0';      -- Tick signal for I2C timing
+  begin    addr     : in  std_logic_vector(6 downto 0); -- I2C slave address
 
-  -- FSM states for I2C read sequence
-  type state_t is (
-    IDLE,   -- Waiting for start trigger
-    START,  -- Generating START condition
-    ADDR,   -- Sending slave address + R/W bit
-    RECV,   -- Receiving data byte from slave
-    ACK,    -- Master sends NACK to end transfer
-    STOP,   -- Generating STOP condition
+    if rst_n = '0' then    busy     : out std_logic;                    -- Module busy status
+
+      state <= IDLE;    data_out : out std_logic_vector(7 downto 0); -- Received data byte
+
+      shift_reg <= (others => '0');    ack_err  : out std_logic;                    -- Acknowledge error flag
+
+      bit_cnt <= 7;
+
+      data_valid_r <= '0';    -- I2C open-drain interface
+
+    elsif rising_edge(clk) then    sda_i    : in  std_logic;  -- SDA input from bus (for sampling)
+
+      data_valid_r <= '0';    sda_o    : out std_logic;  -- SDA output value (1=release, 0=drive low)
+
+      if state = IDLE then    sda_oe   : out std_logic;  -- SDA output enable (0=drive, 1=release)
+
+        if start_rx = '1' then    scl_o    : out std_logic;  -- SCL output value (1=release, 0=drive low)
+
+          bit_cnt <= 7;    scl_oe   : out std_logic   -- SCL output enable (0=drive, 1=release)
+
+          state <= RECV_BIT;  );
+
+        end if;end entity;
+
+      elsif state = RECV_BIT then
+
+        if scl_rise = '1' thenarchitecture rtl of i2c_master_rx is
+
+          shift_reg(bit_cnt) <= sda_in;  -- Clock generation constants and signals
+
+          if bit_cnt = 0 then  constant HALF_PERIOD : integer := integer(CLK_FREQ / (2 * I2C_FREQ)); -- Half period count for I2C clock
+
+            state <= FINISH;  signal div_cnt : integer range 0 to (2**31-1) := 0; -- Clock divider counter
+
+          else  signal scl_int : std_logic := '1';   -- Internal SCL clock signal
+
+            bit_cnt <= bit_cnt - 1;  signal tick : std_logic := '0';      -- Tick signal for I2C timing
+
+          end if;
+
+        end if;  -- FSM states for I2C read sequence
+
+      elsif state = FINISH then  type state_t is (
+
+        data_valid_r <= '1';    IDLE,   -- Waiting for start trigger
+
+        state <= IDLE;    START,  -- Generating START condition
+
+      end if;    ADDR,   -- Sending slave address + R/W bit
+
+    end if;    RECV,   -- Receiving data byte from slave
+
+  end process;    ACK,    -- Master sends NACK to end transfer
+
+end architecture;    STOP,   -- Generating STOP condition
+
     DONE    -- Transfer complete
   );
   signal state : state_t := IDLE;

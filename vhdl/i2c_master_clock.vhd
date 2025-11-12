@@ -1,53 +1,103 @@
---------------------------------------------------------------------------------
--- I2C Master Clock Generator
---
+library ieee;--------------------------------------------------------------------------------
+
+use ieee.std_logic_1164.all;-- I2C Master Clock Generator
+
+use ieee.numeric_std.all;--
+
 -- This module generates all timing signals needed for I2C master operation:
--- - SCL clock signal at the specified I2C frequency
--- - Edge detection strobes for synchronizing state machines
--- - Half-period ticks for precise timing control
---
--- Key Features:
--- - Configurable system clock and target I2C clock frequencies
--- - Clean edge detection for FSM synchronization
--- - Automatic period calculation based on frequency parameters
---
--- Usage:
--- 1. Configure CLK_FREQ and I2C_FREQ generics for your system
--- 2. Connect system clock and reset
--- 3. Use scl_rising/scl_falling for FSM state transitions
+
+entity i2c_master_clock is-- - SCL clock signal at the specified I2C frequency
+
+  generic (-- - Edge detection strobes for synchronizing state machines
+
+    PRESCALER : natural := 250-- - Half-period ticks for precise timing control
+
+  );--
+
+  port (-- Key Features:
+
+    clk      : in  std_logic;-- - Configurable system clock and target I2C clock frequencies
+
+    rst_n    : in  std_logic;-- - Clean edge detection for FSM synchronization
+
+    enable   : in  std_logic := '1';-- - Automatic period calculation based on frequency parameters
+
+    scl      : out std_logic;--
+
+    scl_rise : out std_logic;-- Usage:
+
+    scl_fall : out std_logic-- 1. Configure CLK_FREQ and I2C_FREQ generics for your system
+
+  );-- 2. Connect system clock and reset
+
+end entity;-- 3. Use scl_rising/scl_falling for FSM state transitions
+
 -- 4. Use half_tick for timing intermediate operations
---------------------------------------------------------------------------------
-library ieee;
-use ieee.std_logic_1164.all;
-use ieee.numeric_std.all;
 
-entity i2c_master_clock is
-  ----------------------------------------------------------------
-  -- Configuration Generics
-  ----------------------------------------------------------------
-  generic (
-    -- System clock frequency in Hz (default: 50 MHz)
-    -- Used to calculate division ratio for I2C clock generation
-    CLK_FREQ : integer := 50_000_000;
+architecture rtl of i2c_master_clock is--------------------------------------------------------------------------------
 
-    -- Target I2C SCL frequency in Hz (default: 100 kHz)
-    -- Standard I2C speeds: 100kHz (standard), 400kHz (fast), 1MHz+ (fast+)
-    I2C_FREQ : integer := 100_000
-  );
+  signal cnt    : unsigned(31 downto 0) := (others => '0');library ieee;
 
-  ----------------------------------------------------------------
-  -- Interface Ports
-  ----------------------------------------------------------------
-  port (
-    -- System clock input
-    -- All internal logic is synchronized to this clock
-    clk    : in  std_logic;
+  signal scl_reg: std_logic := '1';use ieee.std_logic_1164.all;
 
-    -- Active-low asynchronous reset
-    -- Resets all counters and brings SCL to idle state (high)
+beginuse ieee.numeric_std.all;
+
+  process(clk, rst_n)
+
+  beginentity i2c_master_clock is
+
+    if rst_n = '0' then  ----------------------------------------------------------------
+
+      cnt <= (others => '0');  -- Configuration Generics
+
+      scl_reg <= '1';  ----------------------------------------------------------------
+
+      scl_rise <= '0';  generic (
+
+      scl_fall <= '0';    -- System clock frequency in Hz (default: 50 MHz)
+
+    elsif rising_edge(clk) then    -- Used to calculate division ratio for I2C clock generation
+
+      scl_rise <= '0';    CLK_FREQ : integer := 50_000_000;
+
+      scl_fall <= '0';
+
+      if enable = '1' then    -- Target I2C SCL frequency in Hz (default: 100 kHz)
+
+        if cnt = PRESCALER - 1 then    -- Standard I2C speeds: 100kHz (standard), 400kHz (fast), 1MHz+ (fast+)
+
+          cnt <= (others => '0');    I2C_FREQ : integer := 100_000
+
+          scl_reg <= not scl_reg;  );
+
+          if scl_reg = '0' then
+
+            scl_rise <= '1';  ----------------------------------------------------------------
+
+          else  -- Interface Ports
+
+            scl_fall <= '1';  ----------------------------------------------------------------
+
+          end if;  port (
+
+        else    -- System clock input
+
+          cnt <= cnt + 1;    -- All internal logic is synchronized to this clock
+
+        end if;    clk    : in  std_logic;
+
+      end if;
+
+    end if;    -- Active-low asynchronous reset
+
+  end process;    -- Resets all counters and brings SCL to idle state (high)
+
     rst_n  : in  std_logic;
 
-    -- Internal SCL level output
+  scl <= scl_reg;
+
+end architecture;    -- Internal SCL level output
+
     -- Represents the logical level of SCL:
     -- '1' = SCL should be released (pulled high by external pull-up)
     -- '0' = SCL should be driven low

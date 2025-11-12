@@ -1,81 +1,162 @@
---------------------------------------------------------------------------------
--- I2C Master Transmitter Module
---
--- This module implements the transmitter (TX) portion of an I2C master device.
--- It handles the following I2C operations:
--- - Generation of START condition
--- - Transmission of 7-bit slave address + R/W bit
--- - Transmission of 8-bit data
--- - ACK/NACK reception from slave
--- - Generation of STOP condition
---
--- The module uses open-drain style control for I2C bus lines (SDA/SCL):
--- - *_o signals specify the value to drive (0 or 1)
--- - *_oe signals control the output enable:
---   * '0' = actively drive the corresponding *_o value
---   * '1' = release the line (high-Z, pulled up by external resistor)
---
--- Timing:
--- - All FSM state transitions happen on SCL falling edges
--- - SDA changes occur while SCL is low (except START/STOP)
--- - Data is held stable while SCL is high
---
--- Usage:
--- 1. Configure CLK_FREQ and I2C_FREQ generics for your system
--- 2. Connect SDA/SCL outputs to open-drain I/O cells with pull-ups
--- 3. Assert 'start' with valid 'addr' and 'data_in'
--- 4. Wait for operation completion ('busy' low)
--- 5. Check 'ack_err' for transmission status
---------------------------------------------------------------------------------
-library ieee;
+library ieee;use ieee.numeric_std.all;
+
 use ieee.std_logic_1164.all;
+
 use ieee.numeric_std.all;
 
-entity i2c_master_tx is
-  ----------------------------------------------------------------
-  -- Configuration Generics
-  ----------------------------------------------------------------
-  generic (
-    -- System clock frequency in Hz (default: 50 MHz)
-    -- Must match your system's actual clock frequency
-    CLK_FREQ : integer := 50_000_000;
+library ieee;
 
-    -- Target I2C SCL frequency in Hz (default: 100 kHz)
-    -- Common values: 100kHz (standard-mode), 400kHz (fast-mode)
-    I2C_FREQ : integer := 100_000
-  );
+entity i2c_master_tx isuse ieee.std_logic_1164.all;
 
-  ----------------------------------------------------------------
-  -- Interface Ports
-  ----------------------------------------------------------------
-  port (
-    -- System clock and reset
-    clk    : in  std_logic;  -- System clock input
-    rst_n  : in  std_logic;  -- Async active-low reset
+  port (use ieee.numeric_std.all;
 
-    -- Control and data signals
-    start  : in  std_logic;  -- Pulse high to initiate transfer
-    addr   : in  std_logic_vector(6 downto 0);  -- Target slave address
-    rw     : in  std_logic;  -- Read/Write select ('0'=write, '1'=read)
-    data_in: in  std_logic_vector(7 downto 0);  -- Byte to transmit
+    clk         : in  std_logic;
 
-    -- Status outputs
-    busy   : out std_logic;  -- High while transfer is in progress
-    ack_err: out std_logic;  -- High if slave responds with NACK
+    rst_n       : in  std_logic;entity i2c_master_tx is
 
-    ----------------------------------------------------------------
-    -- I2C Bus Interface (Open-Drain Style)
-    ----------------------------------------------------------------
-    -- SDA (Serial Data Line) control
-    sda_o  : out std_logic;  -- Value to drive (0=low, 1=high)
-    sda_oe : out std_logic;  -- Output enable (0=drive, 1=release)
+    start_tx    : in  std_logic;  port (
 
-    -- SCL (Serial Clock Line) control
-    scl_o  : out std_logic;  -- Value to drive (0=low, 1=high)
-    scl_oe : out std_logic   -- Output enable (0=drive, 1=release)
-  );
-end entity;
+    data_in     : in  std_logic_vector(7 downto 0);    clk         : in  std_logic;
 
+    scl_rise    : in  std_logic;    rst_n       : in  std_logic;
+
+    scl_fall    : in  std_logic;    start_tx    : in  std_logic;
+
+    sda_in      : in  std_logic;    data_in     : in  std_logic_vector(7 downto 0);
+
+    sda_out     : out std_logic;    scl_rise    : in  std_logic;
+
+    busy        : out std_logic;    scl_fall    : in  std_logic;
+
+    ack_received: out std_logic;    sda_in      : in  std_logic;
+
+    done        : out std_logic    sda_out     : out std_logic;
+
+  );    busy        : out std_logic;
+
+end entity;    ack_received: out std_logic;
+
+    done        : out std_logic
+
+architecture rtl of i2c_master_tx is  );
+
+  type t_state is (IDLE, START, SEND_BIT, RECV_ACK, FINISH);end entity;
+
+  signal state : t_state := IDLE;
+
+  signal bit_cnt : integer range 0 to 7 := 0;architecture rtl of i2c_master_tx is
+
+  signal shift_reg : std_logic_vector(7 downto 0) := (others => '0');  type t_state is (IDLE, START, SEND_BIT, RECV_ACK, FINISH);
+
+  signal sda_drive : std_logic := 'Z';  signal state : t_state := IDLE;
+
+  signal ack_r : std_logic := '1';  signal bit_cnt : integer range 0 to 7 := 0;
+
+  signal done_r: std_logic := '0';  signal shift_reg : std_logic_vector(7 downto 0) := (others => '0');
+
+begin  signal sda_drive : std_logic := 'Z';
+
+  sda_out <= sda_drive;  signal ack_r : std_logic := '1';
+
+  busy <= '1' when state /= IDLE else '0';  signal done_r: std_logic := '0';
+
+  ack_received <= ack_r;begin
+
+  done <= done_r;  sda_out <= sda_drive;
+
+  busy <= '1' when state /= IDLE else '0';
+
+  process(clk, rst_n)  ack_received <= ack_r;
+
+  begin  done <= done_r;
+
+    if rst_n = '0' then
+
+      state <= IDLE;  process(clk, rst_n)
+
+      shift_reg <= (others => '0');  begin
+
+      bit_cnt <= 0;    if rst_n = '0' then
+
+      sda_drive <= 'Z';      state <= IDLE;
+
+      ack_r <= '1';      shift_reg <= (others => '0');
+
+      done_r <= '0';      bit_cnt <= 0;
+
+    elsif rising_edge(clk) then      sda_drive <= 'Z';
+
+      done_r <= '0';      ack_r <= '1';
+
+      if state = IDLE then      done_r <= '0';
+
+        if start_tx = '1' then    elsif rising_edge(clk) then
+
+          shift_reg <= data_in;      done_r <= '0';
+
+          bit_cnt <= 7;      if state = IDLE then
+
+          state <= START;        if start_tx = '1' then
+
+        end if;          shift_reg <= data_in;
+
+      elsif state = START then          bit_cnt <= 7;
+
+        if scl_fall = '1' then          state <= START;
+
+          sda_drive <= shift_reg(bit_cnt);        end if;
+
+          state <= SEND_BIT;      elsif state = START then
+
+        end if;        if scl_fall = '1' then
+
+      elsif state = SEND_BIT then          sda_drive <= shift_reg(bit_cnt);
+
+        if scl_fall = '1' then          state <= SEND_BIT;
+
+          if bit_cnt = 0 then        end if;
+
+            sda_drive <= 'Z';      elsif state = SEND_BIT then
+
+            state <= RECV_ACK;        if scl_fall = '1' then
+
+          else          if bit_cnt = 0 then
+
+            bit_cnt <= bit_cnt - 1;            sda_drive <= 'Z';
+
+            sda_drive <= shift_reg(bit_cnt - 1);            state <= RECV_ACK;
+
+          end if;          else
+
+        end if;            bit_cnt <= bit_cnt - 1;
+
+      elsif state = RECV_ACK then            sda_drive <= shift_reg(bit_cnt - 1);
+
+        if scl_rise = '1' then          end if;
+
+          ack_r <= sda_in;        end if;
+
+          state <= FINISH;      elsif state = RECV_ACK then
+
+        end if;        if scl_rise = '1' then
+
+      elsif state = FINISH then          ack_r <= sda_in;
+
+        done_r <= '1';          state <= FINISH;
+
+        state <= IDLE;        end if;
+
+      end if;      elsif state = FINISH then
+
+    end if;        done_r <= '1';
+
+  end process;        state <= IDLE;
+
+end architecture;      end if;
+
+    end if;
+  end process;
+end architecture;
 architecture rtl of i2c_master_tx is
   ----------------------------------------------------------------
   -- Clock Generation Constants and Signals
@@ -110,6 +191,84 @@ architecture rtl of i2c_master_tx is
   -- Bit counter (MSB first transmission)
   signal bit_idx : integer range 0 to 7 := 7;
 
+  library ieee;
+  use ieee.std_logic_1164.all;
+  use ieee.numeric_std.all;
+
+  entity i2c_master_tx is
+    port (
+      clk         : in  std_logic;
+      rst_n       : in  std_logic;
+      start_tx    : in  std_logic;
+      data_in     : in  std_logic_vector(7 downto 0);
+      scl_rise    : in  std_logic;
+      scl_fall    : in  std_logic;
+      sda_in      : in  std_logic;
+      sda_out     : out std_logic;
+      busy        : out std_logic;
+      ack_received: out std_logic;
+      done        : out std_logic
+    );
+  end entity;
+
+  architecture rtl of i2c_master_tx is
+    type t_state is (IDLE, START, SEND_BIT, RECV_ACK, FINISH);
+    signal state : t_state := IDLE;
+    signal bit_cnt : integer range 0 to 7 := 0;
+    signal shift_reg : std_logic_vector(7 downto 0) := (others => '0');
+    signal sda_drive : std_logic := 'Z';
+    signal ack_r : std_logic := '1';
+    signal done_r: std_logic := '0';
+  begin
+    sda_out <= sda_drive;
+    busy <= '1' when state /= IDLE else '0';
+    ack_received <= ack_r;
+    done <= done_r;
+
+    process(clk, rst_n)
+    begin
+      if rst_n = '0' then
+        state <= IDLE;
+        shift_reg <= (others => '0');
+        bit_cnt <= 0;
+        sda_drive <= 'Z';
+        ack_r <= '1';
+        done_r <= '0';
+      elsif rising_edge(clk) then
+        done_r <= '0';
+        if state = IDLE then
+          if start_tx = '1' then
+            shift_reg <= data_in;
+            bit_cnt <= 7;
+            state <= START;
+          end if;
+        elsif state = START then
+          if scl_fall = '1' then
+            sda_drive <= shift_reg(bit_cnt);
+            state <= SEND_BIT;
+          end if;
+        elsif state = SEND_BIT then
+          if scl_fall = '1' then
+            if bit_cnt = 0 then
+              sda_drive <= 'Z';
+              state <= RECV_ACK;
+            else
+              bit_cnt <= bit_cnt - 1;
+              sda_drive <= shift_reg(bit_cnt - 1);
+            end if;
+          end if;
+        elsif state = RECV_ACK then
+          if scl_rise = '1' then
+            ack_r <= sda_in;
+            state <= FINISH;
+          end if;
+        elsif state = FINISH then
+          done_r <= '1';
+          state <= IDLE;
+        end if;
+      end if;
+    end process;
+  end architecture;
   -- Shift register for outgoing data
   signal shift_reg : std_logic_vector(7 downto 0) := (others => '0');
 
